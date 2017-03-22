@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import csv
+import os
 
 dataPath = '../dataProcessing/linkVolecity/LinkVolecity_'
 dataSuffix = '.csv'
@@ -35,6 +36,8 @@ def getLinkList():
 
 
 def main():
+    if not os.path.exists(saveFigurePath):
+        os.makedirs(saveFigurePath)
     linkList = getLinkList()
     for link in linkList:
         data = readData(link)

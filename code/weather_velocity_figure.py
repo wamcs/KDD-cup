@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import csv
+import os
 
 dataPath = '../dataProcessing/splitData/splitData_'
 dataSuffix = '.csv'
@@ -38,6 +39,9 @@ def readData(filename):
 
 
 def main():
+    if not os.path.exists(savePath):
+        os.makedirs(savePath)
+
     allData = []
 
     for i in dataList:

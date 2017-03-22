@@ -2,6 +2,8 @@ path = '../dataSets/training/'
 table3 = 'links (table 3)'
 table5 = 'trajectories(table 5)_training'
 table7 = 'weather (table 7)_training'
+saveLinkVelocityPath = '../dataProcessing/linkVolecity/'
+saveSplitDataPath = '../dataProcessing/splitData'
 
 suffix = '.csv'
 
@@ -10,6 +12,7 @@ from datetime import datetime
 import numpy as np
 import matplotlib as pl
 import math
+import os
 
 # read data from file
 def readData(table):
@@ -177,6 +180,8 @@ def printLinkVolecity(data,lData):
                 temp = [span,velocity,indexSeq,velocitySeq,w]
                 final[linkId].append(temp)
 
+    if not os.path.exists(saveLinkVelocityPath):
+        os.makedirs(saveLinkVelocityPath)
     for item in final.keys():
         temp = final[item]
         temp = np.array(temp)
@@ -231,6 +236,9 @@ def main():
     linkData = dealLinkData(lData)
     data,label = combineData(vData,vLabel,wData,wLabel,linkData)
     result = dealVData(data)
+
+    if not os.path.exists(saveSplitDataPath):
+        os.makedirs(saveSplitDataPath)
 
     printCombineData(data,label)
     printSplitData(result,label)

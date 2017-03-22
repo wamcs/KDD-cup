@@ -4,10 +4,12 @@ import numpy as np
 import csv
 import operator
 from sklearn.neighbors import NearestNeighbors
+import os
 
 path1 = '../dataProcessing/splitData/weather.csv'
 path2 = '../dataProcessing/splitData/splitData.csv'
 path3 = '../dataProcessing/linkVolecity/LinkVolecity_'
+savePath = '../dataProcessing/linkVolecity/'
 
 def readData(filename):
     data = []
@@ -149,6 +151,8 @@ def getLinkVelocity():
     for key in result.keys():
         LinkVolecity.append([key,result[key]])
 
+    if not os.path.exists(savePath):
+        os.makedirs(savePath)
     np.savetxt('../dataProcessing/linkVolecity/LinkVolecity.csv',np.array(LinkVolecity),delimiter=',',fmt='%s')
 
 
