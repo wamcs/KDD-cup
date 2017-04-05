@@ -372,11 +372,16 @@ def predict(start,end,weatherPath,xlf,time,TestData,TrainData):
     # print '==========================================='
     # print 'historalData',historalData
     # historalData.to_csv('../dataProcessing/log/historalData.csv')
+    predictData['tollgate_id'] = predictData['tollgate_id'].apply(lambda x: int(x))
+    predictData['time_window'] = predictData['time_window'].apply(lambda x: int(x))
+    historalData['tollgate_id'] = historalData['tollgate_id'].apply(lambda x: int(x))
+    historalData['time_window'] = historalData['time_window'].apply(lambda x: int(x))
 
     data = pd.merge(predictData,historalData,how = 'left', on = ['intersection_id','tollgate_id','starting_time','time_window'])
     data = data.T.fillna(method='pad', limit=1).T
 
     lengths = pd.DataFrame(lengthsList,columns = ['intersection_id','tollgate_id','lengths'])
+    lengths['tollgate_id'] = lengths['tollgate_id'].apply(lambda x:int(x))
     data = pd.merge(data,lengths,how = 'left',on = ['intersection_id','tollgate_id'])
 
     preVel = data['predict_velocity'].values
@@ -416,14 +421,29 @@ def test():
     timeWindows.extend(range(51,57))
 
     predictData = predict('2016-10-11','2016-10-17',table7,xlf,timeWindows,TestData,TrainData)
-    predictTime = predictData['avg_travel_time'].values
-    testTime = []
+    TestData = TestData[['intersection_id','tollgate_id','starting_time','time_window','travel_time']]
+    predictData['tollgate_id'] = predictData['tollgate_id'].apply(lambda x: int(x))
+    predictData['time_window'] = predictData['time_window'].apply(lambda x: int(x))
+
+    print predictData.info()
+    test = []
     for name,group in TestData.groupby(['intersection_id','tollgate_id','starting_time','time_window'])['travel_time']:
-        testTime.append(group.mean())
-    testTime = np.array(testTime)
+        temp = list(name)
+        temp.append(group.mean())
+        test.append(temp)
+    test = pd.DataFrame(test,columns = ['intersection_id','tollgate_id','starting_time','time_window','travel_time'])
+
+    print test.info()
+    data = pd.merge(predictData,test,how='left',on = ['intersection_id','tollgate_id','starting_time','time_window'])
+    print data
+    data = data.dropna()
+    predictTime = data['avg_travel_time'].values
+    testTime = data['travel_time'].values
+    print predictTime
+    print testTime
 
     # have bug,testTime lack data
-    error = np.sum(np.abs(predictTime - testTime))/float(np.shape(predictTime)[0])
+    error = np.sum(np.abs(predictTime - testTime)/testTime)
     print 'error is',error
 
 def task1():
@@ -464,9 +484,9 @@ def formatTrans(predictData):
         time.append("["+start.strftime("%Y-%m-%d %H:%M:%S")+","+end.strftime("%Y-%m-%d %H:%M:%S")+")")
     time = np.array(time)
     predictData.insert(2,'time_window',time)
-    predictData.to_csv('../dataProcessing/answer.csv',index = False)
+    predictData.to_csv('../dataProcessing/answer3.csv',index = False)
 
 
 
 if __name__ == '__main__':
-    task1()
+    test()
