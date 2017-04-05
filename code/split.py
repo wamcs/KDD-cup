@@ -1,9 +1,15 @@
+# -*- coding utf-8 -*-
 path = '../dataSets/training/'
 table3 = 'links (table 3)'
 table5 = 'trajectories(table 5)_training'
 table7 = 'weather (table 7)_training'
 saveLinkVelocityPath = '../dataProcessing/linkVolecity/'
-saveSplitDataPath = '../dataProcessing/splitData'
+saveLinkVelocityItemPath = '../dataProcessing/linkVolecity/LinkVolecity_'
+saveLinkVelocityFilePath = '../dataProcessing/linkVolecity/LinkVolecity.csv'
+saveSplitDataPath = '../dataProcessing/splitData/'
+saveSplitDataItemPath = '../dataProcessing/splitData/splitData_'
+saveSplitDataFilePath = '../dataProcessing/splitData/splitData.csv'
+saveWeatherPath = '../dataProcessing/splitData/weather.csv'
 
 suffix = '.csv'
 
@@ -15,8 +21,7 @@ import math
 import os
 
 # read data from file
-def readData(table):
-    filename = path+table+suffix
+def readData(filename):
     fr = open(filename,'r')
     lines = csv.reader(fr)
     data = []
@@ -30,6 +35,7 @@ def readData(table):
 # lack weather data from 9.1-9.10
 def combineData(vData,vLabel,wData,wLabel,lData):
     label = vLabel
+    label.extend(['time_window','week'])
     label.extend(wLabel[2:])
 
     # trace_width:spilt link width with notation ';'
@@ -59,8 +65,6 @@ def combineData(vData,vLabel,wData,wLabel,lData):
     hour = int(wData[i][1])
 
     for item in vData:
-
-
         # add weather information
         time = datetime.strptime(item[3], "%Y-%m-%d %H:%M:%S")
         # ignore National Day and Mid-Autumn
@@ -68,6 +72,8 @@ def combineData(vData,vLabel,wData,wLabel,lData):
             continue
 
         temp = item
+        temp.append((time.hour*60+time.minute)/20)
+        temp.append(time.weekday())
         gap = False
         while not (time.year == date.year and time.month == date.month and time.day == date.day and (int(time.hour)/3)*3 == hour):
             if (time.month == date.month and time.day < date.day) or (time.month < date.month) or (time.month == date.month and time.day == date.day and (int(time.hour)/3)*3 < hour):
@@ -131,7 +137,7 @@ def printLinkVolecity(data,lData):
         final[item[0]] = [['time','velocity','informationId','partVelocity','week']]
     for i,item in enumerate(data):
         travel_seq = item[4].split(';')
-        travel_velocity = item[14].split(';')
+        travel_velocity = item[16].split(';')
         for j,seqItem in enumerate(travel_seq):
             section = seqItem.split('#')
             linkId = section[0]
@@ -164,8 +170,6 @@ def printLinkVolecity(data,lData):
         for w in weeks:
             travel_times_week = travel_times[w]
             for span in travel_times_week.keys():
-                length = len(travel_times_week[span])
-                length = length/2
                 velocityList = []
                 indexList = []
 
@@ -185,7 +189,7 @@ def printLinkVolecity(data,lData):
     for item in final.keys():
         temp = final[item]
         temp = np.array(temp)
-        np.savetxt('../dataProcessing/linkVolecity/LinkVolecity_'+str(item)+'.csv',temp,delimiter=',',fmt='%s')
+        np.savetxt(saveLinkVelocityItemPath+str(item)+suffix,temp,delimiter=',',fmt='%s')
 
 
 def dealVData(data):
@@ -213,12 +217,12 @@ def printSplitData(result,label):
 
     for i in range(len(result)):
         temp = np.insert(result[i],0,label,axis=0)
-        np.savetxt('../dataProcessing/splitData/splitData_'+str(temp[1][0])+str(temp[1][1])+'.csv',temp,delimiter=',',fmt="%s")
+        np.savetxt(saveSplitDataItemPath+str(temp[1][0])+str(temp[1][1])+suffix,temp,delimiter=',',fmt="%s")
 
 def printCombineData(data,label):
     result = np.array(data)
     result = np.insert(result,0,label,axis=0)
-    np.savetxt('../dataProcessing/splitData/splitData.csv',result,delimiter=',',fmt='%s')
+    np.savetxt(saveSplitDataFilePath,result,delimiter=',',fmt='%s')
 
 def printRegularWeather(wData,wLabel):
     for i in range(len(wData)-1):
@@ -226,12 +230,43 @@ def printRegularWeather(wData,wLabel):
             wData[i+1][4] = '0.0000'
     result = np.array(wData)
     temp = np.insert(wData,0,wLabel,axis=0)
-    np.savetxt('../dataProcessing/splitData/weather.csv',temp,delimiter=',',fmt='%s')
+    np.savetxt(saveWeatherPath,temp,delimiter=',',fmt='%s')
+
+def printLinkVelocity():
+
+    result = {}
+    linkList = getLinkList()
+    for link in linkList:
+        print link
+        data = readData(saveLinkVelocityItemPath+link+suffix)
+        data.remove(data[0])
+        result[link] = []
+        for item in data:
+            index = item[2].split(';')
+            vel = item[3].split(';')
+            vec = [[int(index[i]),float(vel[i])] for i in range(len(index))]
+            result[link].extend(vec)
+        # result[link] = sorted(result[link],key = operator.itemgetter(0))
+        # velocity = getObjectVelocity(vData,result[link],float(tMode),float(hMode))
+        # result[link] = velocity
+        print sorted(result[link],key = operator.itemgetter(1))[-1][0]
+
+        result[link] = sorted(result[link],key = operator.itemgetter(1))[-1][1]
+
+    LinkVolecity = [['linkId','volecity']]
+    for key in result.keys():
+        LinkVolecity.append([key,result[key]])
+
+    if not os.path.exists(savePath):
+        os.makedirs(savePath)
+    np.savetxt(saveLinkVelocityFilePath,np.array(LinkVolecity),delimiter=',',fmt='%s')
+
+
 
 def main():
-    lData,lLabel = readData(table3)
-    vData,vLabel = readData(table5)
-    wData,wLabel = readData(table7)
+    lData,lLabel = readData(path+table3+suffix)
+    vData,vLabel = readData(path+table5+suffix)
+    wData,wLabel = readData(path+table7+suffix)
 
     linkData = dealLinkData(lData)
     data,label = combineData(vData,vLabel,wData,wLabel,linkData)

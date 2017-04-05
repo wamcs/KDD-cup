@@ -25,11 +25,11 @@ def readData(filename):
         for i,line in enumerate(lines):
             # ignore first row and those rows lacking weather information
             if i == 0:
-                temp = line[6:13]
-                temp.append(line[17])
+                temp = line[8:15]
+                temp.append(line[19])
                 data.append(temp)
                 continue
-            if line[6] == '':
+            if line[8] == '':
                 continue
             temp = [float(x) for x in line[6:13]]
             temp.append(float(line[17]))

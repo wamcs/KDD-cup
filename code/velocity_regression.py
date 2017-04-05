@@ -2,16 +2,15 @@
 
 import numpy as np
 import xgboost as xgb
-import csv
+import
 from datetime import datetime
 import matplotlib.pyplot as plt
 
 path = '../dataProcessing/splitData/splitData.csv'
 pathVelocity = '../dataProcessing/linkVolecity/LinkVolecity.csv'
-linkList = range(100,124)
 
 def readData():
-    # label = ['time','week','pressure','sea_pressure','wind_direction','wind_speed','temperature','rel_humidity','precipitation','length','lane','objective_velocity']
+    # label = ['time','week','wind_direction','wind_speed','temperature','rel_humidity','precipitation','length','lane','objective_velocity']
     with open(pathVelocity,'r') as fr:
         lines = csv.reader(fr)
         data = {}
@@ -29,9 +28,9 @@ def readData():
         for line in lines:
             if lines.line_num == 1:
                 continue
-            if line[6] == '':
+            if line[8] == '':
                 continue
-            weather = [float(i) for i in line[8:13]]
+            weather = [float(i) for i in line[10:15]]
 
             time = datetime.strptime(line[3], "%Y-%m-%d %H:%M:%S")
             # use 0-71 represent time_window
@@ -39,9 +38,9 @@ def readData():
             # 0 - 6 : Mon - Sun
             week = time.weekday()
 
-            lanes =[int(i) for i in line[13].split(';')]
-            velocitys = [float(i) for i in line[14].split(';')]
-            lengths = [int(i) for i in line[15].split(';')]
+            lanes =[int(i) for i in line[15].split(';')]
+            velocitys = [float(i) for i in line[16].split(';')]
+            lengths = [int(i) for i in line[17].split(';')]
             linkId = [item.split('#')[0] for item in line[4].split(';')]
             for i in range(len(lanes)):
                 temp = []
