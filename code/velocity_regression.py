@@ -2,9 +2,8 @@
 
 import numpy as np
 import xgboost as xgb
-import
+import csv
 from datetime import datetime
-import matplotlib.pyplot as plt
 
 path = '../dataProcessing/splitData/splitData.csv'
 pathVelocity = '../dataProcessing/linkVolecity/LinkVolecity.csv'
@@ -23,6 +22,7 @@ def readData():
     trainData = []
     yTestData = []
     testData = []
+    allData = []
     with open(path,'r') as fr:
         lines = csv.reader(fr)
         for line in lines:
@@ -56,19 +56,25 @@ def readData():
                 else:
                     trainData.append(temp)
                     yTrainData.append(velocitys[i])
+                allData.append(temp)
+    trainData = np.array(trainData)
+    yTrainData = np.array(yTrainData)
+    testData = np.array(testData)
+    yTestData = np.array(yTestData)
+    allData = np.array(allData)
+    maxVec = np.max(allData,axis=0).astype(float)
+    trainData = trainData/maxVec
+    testData = testData/maxVec
+    print trainData.shape
+    print testData.shape
     return trainData,yTrainData,testData,yTestData
 
 def main():
-    trainData,yTrainData,testData,yTestData = readData()
-    x = np.array(trainData)
-    y = np.array(yTrainData)
-
-    x_test = np.array(testData)
-    y_test = np.array(yTestData)
+    x,y,x_test,y_test = readData()
 
     xlf = xgb.XGBRegressor(learning_rate=0.1,
                         n_estimators=200,
-                        silent=0,
+                        silent=1,
                         objective='reg:linear',
                         nthread=-1,
                         subsample=1,
@@ -81,12 +87,8 @@ def main():
     xlf.fit(x,y)
     test = xlf.predict(x_test)
 
-    # plt.plot(range(y_test.shape[0]),y_test,'bx',markersize = 10)
-    # plt.plot(range(test.shape[0]),test,'r+',markersize = 10)
-    # plt.show()
-
-    # print 'error is %f' %(np.sum(np.abs(test-y_test)/y_test)/y_test.shape[0])
-    # print 'min error is %f'%(min(test-y_test))
+    print 'error is %f' %(np.sum(np.abs(test-y_test)/y_test)/y_test.shape[0])
+    print 'min error is %f'%(min(test-y_test))
 
     minValue = min(test)
     maxValue = max(test)

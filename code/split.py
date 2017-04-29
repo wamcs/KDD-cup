@@ -1,5 +1,8 @@
 # -*- coding utf-8 -*-
-path = '../dataSets/training/'
+trainingPath = '../dataSets/training/'
+testPath = '../dataSets/testing_phase1/'
+testTable5 = 'trajectories(table 5)_test1.csv'
+testTable7 = 'weather (table 7)_test1.csv'
 table3 = 'links (table 3)'
 table5 = 'trajectories(table 5)_training'
 table7 = 'weather (table 7)_training'
@@ -9,6 +12,7 @@ saveLinkVelocityFilePath = '../dataProcessing/linkVolecity/LinkVolecity.csv'
 saveSplitDataPath = '../dataProcessing/splitData/'
 saveSplitDataItemPath = '../dataProcessing/splitData/splitData_'
 saveSplitDataFilePath = '../dataProcessing/splitData/splitData.csv'
+saveTestSplitDataFilePath = '../dataProcessing/splitData/testData.csv'
 saveWeatherPath = '../dataProcessing/splitData/weather.csv'
 
 suffix = '.csv'
@@ -219,10 +223,10 @@ def printSplitData(result,label):
         temp = np.insert(result[i],0,label,axis=0)
         np.savetxt(saveSplitDataItemPath+str(temp[1][0])+str(temp[1][1])+suffix,temp,delimiter=',',fmt="%s")
 
-def printCombineData(data,label):
+def printCombineData(data,label,path):
     result = np.array(data)
     result = np.insert(result,0,label,axis=0)
-    np.savetxt(saveSplitDataFilePath,result,delimiter=',',fmt='%s')
+    np.savetxt(path,result,delimiter=',',fmt='%s')
 
 def printRegularWeather(wData,wLabel):
     for i in range(len(wData)-1):
@@ -264,19 +268,24 @@ def printLinkVelocity():
 
 
 def main():
-    lData,lLabel = readData(path+table3+suffix)
-    vData,vLabel = readData(path+table5+suffix)
-    wData,wLabel = readData(path+table7+suffix)
+    lData,lLabel = readData(trainingPath+table3+suffix)
+    vData,vLabel = readData(trainingPath+table5+suffix)
+    wData,wLabel = readData(trainingPath+table7+suffix)
+
+    tVDate,tVLable = readData(testPath+testTable5)
+    tWData,tWLabel = readData(testPath+testTable7)
 
     linkData = dealLinkData(lData)
     data,label = combineData(vData,vLabel,wData,wLabel,linkData)
-    result = dealVData(data)
+    tData,tLable = combineData(tVDate,tVLable,tWData,tWLabel,linkData)
+    # result = dealVData(data)
 
     if not os.path.exists(saveSplitDataPath):
         os.makedirs(saveSplitDataPath)
 
-    printCombineData(data,label)
-    printSplitData(result,label)
+    printCombineData(data,label,saveSplitDataFilePath)
+    printCombineData(tData,tLable,saveTestSplitDataFilePath)
+    # printSplitData(result,label)
     printLinkVolecity(data,lData)
     printRegularWeather(wData,wLabel)
 

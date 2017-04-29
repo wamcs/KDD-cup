@@ -36,9 +36,7 @@ def getTrainData():
 
 def calculatedHistoryVelocityData(data):
     result = data.copy()
-    # result['travel_lane'] = result['travel_lane'].apply(lambda x: np.array(x.split(';')).astype(float))
     result['travel_velocity'] = result['travel_velocity'].apply(lambda x: np.array(x.split(';')).astype(float))
-    # result['travel_length'] = result['travel_length'].apply(lambda x: np.array(x.split(';')).astype(float))
     for intersection_id in linkLen.keys():
         for tollgate_id in linkLen[intersection_id].keys():
             index = (result['intersection_id'] == intersection_id) & (result['tollgate_id'] == int(tollgate_id))
@@ -47,75 +45,16 @@ def calculatedHistoryVelocityData(data):
             result.drop(temp,inplace = True)
 
     result = result.drop(['vehicle_id','travel_seq'],axis = 1)
-    # lanes = [['intersection_id','tollgate_id','starting_time','time_window','travel_lane']]
     velocitys = [['intersection_id','tollgate_id','starting_time','time_window','travel_velocity']]
-    # lengths = [['intersection_id','tollgate_id','starting_time','time_window','travel_length']]
-    # for name,group in result.groupby(['intersection_id','tollgate_id','starting_time','time_window'])['travel_lane']:
-    #     temp = list(name)
-    #     temp.append(group.mean())
-    #     lanes.append(temp)
+
     for name,group in result.groupby(['intersection_id','tollgate_id','starting_time','time_window'])['travel_velocity']:
         temp = list(name)
         temp.append(group.mean())
         velocitys.append(temp)
-    # for name,group in result.groupby(['intersection_id','tollgate_id','starting_time','time_window'])['travel_length']:
-    #     temp = list(name)
-    #     temp.append(group.mean())
-    #     lengths.append(temp)
-    # lanes = pd.DataFrame(lanes[1:],columns=lanes[0])
+
     velocitys = pd.DataFrame(velocitys[1:],columns=velocitys[0])
-    # lengths = pd.DataFrame(lengths[1:],columns=lengths[0])
+
     return velocitys
-
-
-def combineVelocityTrainData():
-    # label = ['time','week','wind_direction','wind_speed','temperature','rel_humidity','precipitation','length','lane','objective_velocity']
-    with open(split.saveLinkVelocityFilePath,'r') as fr:
-        lines = csv.reader(fr)
-        data = {}
-        for line in lines:
-            if lines.line_num == 1:
-                continue
-            data[line[0]] = float(line[1])
-
-    yTrainData = []
-    trainData = []
-    yTestData = []
-    testData = []
-    with open(split.saveSplitDataFilePath,'r') as fr:
-        lines = csv.reader(fr)
-        for line in lines:
-            if lines.line_num == 1:
-                continue
-            if line[8] == '':
-                continue
-            weather = [float(i) for i in line[10:15]]
-
-            time = datetime.strptime(line[3], "%Y-%m-%d %H:%M:%S")
-            # use 0-71 represent time_window
-            time_window = (time.hour * 60 + time.minute)/20
-            # 0 - 6 : Mon - Sun
-            week = time.weekday()
-
-            lanes =[int(i) for i in line[15].split(';')]
-            velocitys = [float(i) for i in line[16].split(';')]
-            lengths = [int(i) for i in line[17].split(';')]
-            linkId = [item.split('#')[0] for item in line[4].split(';')]
-            for i in range(len(lanes)):
-                temp = []
-                temp.append(time_window)
-                temp.append(week)
-                temp.extend(weather)
-                temp.append(lengths[i])
-                temp.append(lanes[i])
-                temp.append(data[linkId[i]])
-                if time.month == 10 and time.day>=11:
-                    testData.append(temp)
-                    yTestData.append(velocitys[i])
-                else:
-                    trainData.append(temp)
-                    yTrainData.append(velocitys[i])
-    return trainData,yTrainData,testData,yTestData
 
 def generateTrainData():
     # label = ['time','week','wind_direction','wind_speed','temperature','rel_humidity','precipitation','length','lane','objective_velocity']
@@ -158,13 +97,13 @@ def generateTrainData():
                 temp.append(data[linkId[i]])
                 trainData.append(temp)
                 yTrainData.append(velocitys[i])
+    trainData = np.array(trainData)
+    yTrainData = np.array(yTrainData)
     return trainData,yTrainData
 
 
 
 def trainVelocityRegression(xTrain,yTrain):
-    xTrain = np.array(xTrain)
-    yTrain = np.array(yTrain)
     xlf = xgb.XGBRegressor(learning_rate=0.1,
                         n_estimators=200,
                         silent=1,
@@ -249,7 +188,7 @@ def getCorrespondingVelocity(trainVelocity,aimVelocity):
     label = ['intersection_id','tollgate_id','starting_time','time_window','his_velocity']
     return pd.DataFrame(result,columns = label)
 
-def predictVelocity(start,end,routes,links,weatherPath,xlf,timeWindows):
+def predictVelocity(start,end,routes,links,weatherPath,timeWindows,lackDay = []):
 
     weather = []
     with open(weatherPath,'r') as fr:
@@ -278,6 +217,11 @@ def predictVelocity(start,end,routes,links,weatherPath,xlf,timeWindows):
             for i,time in enumerate(times):
                 for window in timeWindows:
                     for link in routes[intersection][tollgate]:
+                        if time in lackDay:
+                            continue
+                        weatherList = weather[np.nonzero((weather[:,0] == time)&(weather[:,1] == str((int(window)/9)*3)))[0],4:].astype(float).tolist()
+                        if weatherList == []:
+                            continue
                         temp = []
                         temp.append(intersection)
                         temp.append(tollgate)
@@ -285,14 +229,20 @@ def predictVelocity(start,end,routes,links,weatherPath,xlf,timeWindows):
                         temp.append(link)
                         temp.append(int(window))
                         temp.append(weeks[i])
-                        weatherList = weather[np.nonzero((weather[:,0] == time)&(weather[:,1] == str((int(window)/9)*3)))[0],4:].astype(float).tolist()
                         temp.extend(weatherList[0])
                         temp.extend(links[link])
                         data.append(temp)
     data = np.array(data)
 
     trainData = data[:,4:].astype(float)
+    x,y = generateTrainData()
+    wholeData = np.insert(x,0,trainData,axis=0)
+    maxVec = np.max(wholeData,axis=0).astype(float)
+    trainData = trainData/maxVec
+    x = x/maxVec
+    xlf = trainVelocityRegression(x,y)
     resultVel = xlf.predict(trainData)
+
     data = pd.DataFrame(data,columns = label)
     data.insert(14,'predict_velocity',resultVel)
 
@@ -308,7 +258,7 @@ def predictVelocity(start,end,routes,links,weatherPath,xlf,timeWindows):
 
     return pd.DataFrame(result,columns = ['intersection_id','tollgate_id','starting_time','time_window','predict_velocity'])
 
-def predict(start,end,weatherPath,xlf,time,TestData,TrainData):
+def predict(start,end,weatherPath,time,TestData,TrainData):
     routes = {}
     links = {}
     lengths = {}
@@ -358,7 +308,7 @@ def predict(start,end,weatherPath,xlf,time,TestData,TrainData):
     # print '==========================================='
     # print 'lengths is',lengths
 
-    predictData = predictVelocity(start,end,routes,links,weatherPath,xlf,time)
+    predictData = predictVelocity(start,end,routes,links,weatherPath,time)
     # print '==========================================='
     # print 'predictData is',predictData
     aimVelocity = calculatedHistoryVelocityData(TestData)
@@ -404,58 +354,14 @@ def predict(start,end,weatherPath,xlf,time,TestData,TrainData):
     # print 'data is ',data
     return data
 
-
-
-def test():
-    TrainData = getTrainData()
-    TestData = TrainData[:][TrainData['starting_time']>='2016-10-11']
-    TrainData = TrainData[:][TrainData['starting_time']<'2016-10-11']
-    trainData,yTrainData,testData,yTestData = combineVelocityTrainData()
-    xlf = trainVelocityRegression(trainData,yTrainData)
-
-    time = range(18,24)
-    time.extend(range(45,51))
-    TestData = TestData[:][TestData['time_window'].isin(time)]
-
-    timeWindows = range(24,30)
-    timeWindows.extend(range(51,57))
-
-    predictData = predict('2016-10-11','2016-10-17',table7,xlf,timeWindows,TestData,TrainData)
-    TestData = TestData[['intersection_id','tollgate_id','starting_time','time_window','travel_time']]
-    predictData['tollgate_id'] = predictData['tollgate_id'].apply(lambda x: int(x))
-    predictData['time_window'] = predictData['time_window'].apply(lambda x: int(x))
-
-    print predictData.info()
-    test = []
-    for name,group in TestData.groupby(['intersection_id','tollgate_id','starting_time','time_window'])['travel_time']:
-        temp = list(name)
-        temp.append(group.mean())
-        test.append(temp)
-    test = pd.DataFrame(test,columns = ['intersection_id','tollgate_id','starting_time','time_window','travel_time'])
-
-    print test.info()
-    data = pd.merge(predictData,test,how='left',on = ['intersection_id','tollgate_id','starting_time','time_window'])
-    print data
-    data = data.dropna()
-    predictTime = data['avg_travel_time'].values
-    testTime = data['travel_time'].values
-    print predictTime
-    print testTime
-
-    # have bug,testTime lack data
-    error = np.sum(np.abs(predictTime - testTime)/testTime)
-    print 'error is',error
-
 def task1():
     TrainData = getTrainData()
     TestData = splitTestData()
-    trainData,yTrainData = generateTrainData()
-    xlf = trainVelocityRegression(trainData,yTrainData)
 
     timeWindows = range(24,30)
     timeWindows.extend(range(51,57))
 
-    predictData = predict('2016-10-18','2016-10-24',testWeatherPath,xlf,timeWindows,TestData,TrainData)
+    predictData = predict('2016-10-18','2016-10-24',testWeatherPath,timeWindows,TestData,TrainData)
     formatTrans(predictData)
 
 def formatTrans(predictData):
@@ -484,9 +390,9 @@ def formatTrans(predictData):
         time.append("["+start.strftime("%Y-%m-%d %H:%M:%S")+","+end.strftime("%Y-%m-%d %H:%M:%S")+")")
     time = np.array(time)
     predictData.insert(2,'time_window',time)
-    predictData.to_csv('../dataProcessing/answer3.csv',index = False)
+    predictData.to_csv('../dataProcessing/answer2.csv',index = False)
 
 
 
 if __name__ == '__main__':
-    test()
+    task1()
