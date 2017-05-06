@@ -6,6 +6,7 @@ import split as split
 import csv
 import xgboost as xgb
 import operator
+from sklearn.svm import SVR
 
 splitDataPath = '../dataProcessing/splitData/splitData.csv'
 testDataPath = '../dataSets/testing_phase1/trajectories(table 5)_test1.csv'
@@ -19,7 +20,7 @@ linkLen ={'A':{'2':6,'3':8},'B':{'1':9,'3':5},'C':{'1':12,'3':8}}
 def splitTestData():
     testData,testLable = split.readData(testDataPath)
     testWData,testWLable = split.readData(testWeatherPath)
-    lData,lLabel = split.readData(split.path+split.table3+split.suffix)
+    lData,lLabel = split.readData(split.trainingPath+split.table3+split.suffix)
     linkData = split.dealLinkData(lData)
     testData,testLable = split.combineData(testData,testLable,testWData,testWLable,linkData)
     testData = np.array(testData)
@@ -104,20 +105,23 @@ def generateTrainData():
 
 
 def trainVelocityRegression(xTrain,yTrain):
-    xlf = xgb.XGBRegressor(learning_rate=0.1,
-                        n_estimators=200,
-                        silent=1,
-                        objective='reg:linear',
-                        nthread=-1,
-                        subsample=1,
-                        colsample_bytree=0.7,
-                        colsample_bylevel=1,
-                        scale_pos_weight=1,
-                        seed=1440,
-                        missing=None)
-
-    xlf.fit(xTrain,yTrain)
-    return xlf
+    # xlf = xgb.XGBRegressor(learning_rate=0.1,
+    #                     n_estimators=200,
+    #                     silent=1,
+    #                     objective='reg:linear',
+    #                     nthread=-1,
+    #                     subsample=1,
+    #                     colsample_bytree=0.7,
+    #                     colsample_bylevel=1,
+    #                     scale_pos_weight=1,
+    #                     seed=1440,
+    #                     missing=None)
+    clf = SVR(kernel='rbf',C=1.0, epsilon=0.2,gamma=0.1,cache_size = 1000)
+    print '====='
+    # xlf.fit(xTrain,yTrain)
+    clf.fit(xTrain,yTrain)
+    print '==='
+    return clf
 
 def getCorrespondingVelocity(trainVelocity,aimVelocity):
     data = trainVelocity.copy()
@@ -210,6 +214,7 @@ def predictVelocity(start,end,routes,links,weatherPath,timeWindows,lackDay = [])
         weeks.append(tempTime.weekday())
         tempTime += timedelta(days = 1)
 
+    print '====='
     data = []
     label = ['intersection_id','tollgate_id','starting_time','link','time_window','week','wind_direction','wind_speed','temperature','rel_humidity','precipitation','length','lane','objective_velocity']
     for intersection in routes.keys():
@@ -234,18 +239,22 @@ def predictVelocity(start,end,routes,links,weatherPath,timeWindows,lackDay = [])
                         data.append(temp)
     data = np.array(data)
 
+    print '====='
     trainData = data[:,4:].astype(float)
     x,y = generateTrainData()
-    wholeData = np.insert(x,0,trainData,axis=0)
-    maxVec = np.max(wholeData,axis=0).astype(float)
-    trainData = trainData/maxVec
-    x = x/maxVec
+    # wholeData = np.insert(x,0,trainData,axis=0)
+    # maxVec = np.max(wholeData,axis=0).astype(float)
+    # trainData = trainData/maxVec
+    # x = x/maxVec
+    print '====='
     xlf = trainVelocityRegression(x,y)
+    print '====='
     resultVel = xlf.predict(trainData)
 
     data = pd.DataFrame(data,columns = label)
     data.insert(14,'predict_velocity',resultVel)
 
+    print '====='
     result = []
     for name,group in data.groupby(['intersection_id','tollgate_id','starting_time','time_window'])['predict_velocity']:
         temp = list(name)
@@ -309,18 +318,18 @@ def predict(start,end,weatherPath,time,TestData,TrainData):
     # print 'lengths is',lengths
 
     predictData = predictVelocity(start,end,routes,links,weatherPath,time)
-    # print '==========================================='
-    # print 'predictData is',predictData
+    print '==========================================='
+    print 'predictData is',predictData
     aimVelocity = calculatedHistoryVelocityData(TestData)
-    # print '==========================================='
-    # print 'aimVelocity:',aimVelocity
+    print '==========================================='
+    print 'aimVelocity:',aimVelocity
     trainVelocity = calculatedHistoryVelocityData(TrainData)
-    # print '==========================================='
-    # print 'trainVelocity',trainVelocity
+    print '==========================================='
+    print 'trainVelocity',trainVelocity
 
     historalData = getCorrespondingVelocity(trainVelocity,aimVelocity)
-    # print '==========================================='
-    # print 'historalData',historalData
+    print '==========================================='
+    print 'historalData',historalData
     # historalData.to_csv('../dataProcessing/log/historalData.csv')
     predictData['tollgate_id'] = predictData['tollgate_id'].apply(lambda x: int(x))
     predictData['time_window'] = predictData['time_window'].apply(lambda x: int(x))
@@ -337,10 +346,10 @@ def predict(start,end,weatherPath,time,TestData,TrainData):
     preVel = data['predict_velocity'].values
     hisVel = data['his_velocity'].values
     linkLength = data['lengths'].values
-    # print '==========================================='
-    # print 'preVel',preVel
-    # print 'hisVel',hisVel
-    # print 'linkLength',linkLength
+    print '==========================================='
+    print 'preVel',preVel
+    print 'hisVel',hisVel
+    print 'linkLength',linkLength
     vel = (preVel+hisVel)/2
     travelTime = []
     for i,v in enumerate(vel):
@@ -350,17 +359,19 @@ def predict(start,end,weatherPath,time,TestData,TrainData):
 
     data.insert(7,'avg_travel_time',travelTime)
     data.drop(['predict_velocity','his_velocity','lengths'],axis = 1,inplace = True)
-    # print '==========================================='
-    # print 'data is ',data
+    print '==========================================='
+    print 'data is ',data
     return data
 
 def task1():
     TrainData = getTrainData()
     TestData = splitTestData()
 
+    print 'handle data'
     timeWindows = range(24,30)
     timeWindows.extend(range(51,57))
 
+    print 'begain predicting'
     predictData = predict('2016-10-18','2016-10-24',testWeatherPath,timeWindows,TestData,TrainData)
     formatTrans(predictData)
 
@@ -390,7 +401,7 @@ def formatTrans(predictData):
         time.append("["+start.strftime("%Y-%m-%d %H:%M:%S")+","+end.strftime("%Y-%m-%d %H:%M:%S")+")")
     time = np.array(time)
     predictData.insert(2,'time_window',time)
-    predictData.to_csv('../dataProcessing/answer2.csv',index = False)
+    predictData.to_csv('../dataProcessing/answerSVR.csv',index = False)
 
 
 
