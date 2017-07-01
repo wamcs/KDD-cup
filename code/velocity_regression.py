@@ -10,13 +10,13 @@ pathVelocity = '../dataProcessing/linkVolecity/LinkVolecity.csv'
 
 def readData():
     # label = ['time','week','wind_direction','wind_speed','temperature','rel_humidity','precipitation','length','lane','objective_velocity']
-    with open(pathVelocity,'r') as fr:
-        lines = csv.reader(fr)
-        data = {}
-        for line in lines:
-            if lines.line_num == 1:
-                continue
-            data[line[0]] = float(line[1])
+    # with open(pathVelocity,'r') as fr:
+    #     lines = csv.reader(fr)
+    #     data = {}
+    #     for line in lines:
+    #         if lines.line_num == 1:
+    #             continue
+    #         data[line[0]] = float(line[1])
 
     yTrainData = []
     trainData = []
@@ -26,6 +26,8 @@ def readData():
     with open(path,'r') as fr:
         lines = csv.reader(fr)
         for line in lines:
+            leap = False
+
             if lines.line_num == 1:
                 continue
             if line[8] == '':
@@ -42,6 +44,12 @@ def readData():
             velocitys = [float(i) for i in line[16].split(';')]
             lengths = [int(i) for i in line[17].split(';')]
             linkId = [item.split('#')[0] for item in line[4].split(';')]
+            for v in velocitys:
+                if v>30:
+                    leap = True
+            if leap:
+                continue
+
             for i in range(len(lanes)):
                 temp = []
                 temp.append(time_window)
@@ -49,7 +57,10 @@ def readData():
                 temp.extend(weather)
                 temp.append(lengths[i])
                 temp.append(lanes[i])
-                temp.append(data[linkId[i]])
+                if i>0:
+                    temp.append(velocitys[i-1])
+                else:
+                    temp.append(-1)
                 if time.month == 10 and time.day>=11:
                     testData.append(temp)
                     yTestData.append(velocitys[i])
@@ -73,7 +84,7 @@ def main():
     x,y,x_test,y_test = readData()
 
     xlf = xgb.XGBRegressor(learning_rate=0.1,
-                        n_estimators=200,
+                        n_estimators=600,
                         silent=1,
                         objective='reg:linear',
                         nthread=-1,

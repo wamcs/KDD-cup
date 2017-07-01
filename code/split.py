@@ -72,8 +72,8 @@ def combineData(vData,vLabel,wData,wLabel,lData):
         # add weather information
         time = datetime.strptime(item[3], "%Y-%m-%d %H:%M:%S")
         # ignore National Day and Mid-Autumn
-        if (time.month == 10 and time.day>=1 and time.day<=7) or (time.month == 9 and time.day <=16 and time.day >=14):
-            continue
+        # if (time.month == 10 and time.day>=1 and time.day<=7) or (time.month == 9 and time.day <=16 and time.day >=14):
+        #     continue
 
         temp = item
         temp.append((time.hour*60+time.minute)/20)
